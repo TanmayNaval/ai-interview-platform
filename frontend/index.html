@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Platform (Gemini)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .ai-card { background-color: #1F2937; border: 1px solid #374151; border-radius: 1rem; padding: 2rem; max-width: 800px; width: 100%; margin: 2rem auto; }
+        .form-input, .form-select, .form-textarea { background-color: #374151; border: 1px solid #4B5563; color: #F9FAFB; border-radius: 0.5rem; width: 100%; padding: 0.75rem 1rem; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: #F59E0B; box-shadow: 0 0 0 2px #F59E0B; }
+        .btn-primary { background-color: #F59E0B; color: #111827; font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 0.5rem; transition: background-color 0.2s; cursor: pointer; border: none; }
+        .btn-primary:hover { background-color: #D97706; }
+        .btn-primary:disabled { background-color: #4B5563; cursor: not-allowed; color: #9CA3AF; }
+        .btn-secondary { background-color: #374151; color: #F9FAFB; font-weight: 600; padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: 1px solid #4B5563; }
+        .step-indicator { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .step-number { background-color: #F59E0B; color: #111827; width: 2rem; height: 2rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+        .hidden { display: none; }
+        .upload-area { border: 2px dashed #4B5563; border-radius: 0.5rem; padding: 2rem; text-align: center; cursor: pointer; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #F59E0B; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 2rem auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .mic-button.recording { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
+        #errorMessage { background-color: #7f1d1d; color: #fecaca; padding: 1rem; border-radius: 0.5rem; border: 1px solid #b91c1c; margin-top: 1.5rem; }
+    </style>
+</head>
+<body class="text-gray-200">
+    <div class="container mx-auto px-4">
+        <header class="text-center py-8">
+            <h1 class="text-4xl font-bold text-white"><span class="text-amber-500">🧠</span> AI Interview Platform <span class="text-sm font-normal text-gray-400">(Powered by Gemini)</span></h1>
+            <p class="text-gray-400 mt-2">Automated recruitment with intelligent voice interviews</p>
+        </header>
+
+        <section id="step1" class="ai-card">
+            <div class="step-indicator"><div class="step-number">1</div><h2 class="text-2xl font-semibold text-white">Candidate Information</h2></div>
+            <div class="space-y-6">
+                <div><label for="candidateName" class="block mb-2 text-sm font-medium text-gray-300">Candidate Name</label><input type="text" id="candidateName" class="form-input" placeholder="e.g., Jane Doe"></div>
+                <div><label for="jobTitle" class="block mb-2 text-sm font-medium text-gray-300">Job Title</label><input type="text" id="jobTitle" class="form-input" placeholder="e.g., Senior Software Engineer"></div>
+                <div><label for="experienceLevel" class="block mb-2 text-sm font-medium text-gray-300">Experience Level</label><select id="experienceLevel" class="form-select"><option>Entry-Level (0-2 years)</option><option selected>Intermediate (2-5 years)</option><option>Senior (5-10 years)</option><option>Lead/Principal (10+ years)</option></select></div>
+                <div class="text-right"><button id="continueBtn" class="btn-primary">Continue →</button></div>
+            </div>
+        </section>
+
+        <section id="step2" class="ai-card hidden">
+            <div class="step-indicator"><div class="step-number">2</div><h2 class="text-2xl font-semibold text-white">Upload Documents</h2></div>
+            <div class="space-y-6">
+                <div><label class="block mb-2 text-sm font-medium text-gray-300">Resume/CV</label><div id="resumeUpload" class="upload-area"><p id="resumeUploadText" class="text-gray-400">Click to upload (PDF, TXT)</p></div><input type="file" id="resumeFile" class="hidden" accept=".pdf,.txt"></div>
+                <div><label class="block mb-2 text-sm font-medium text-gray-300">Job Description</label><div id="jdUpload" class="upload-area"><p id="jdUploadText" class="text-gray-400">Click to upload (PDF, TXT)</p></div><input type="file" id="jdFile" class="hidden" accept=".pdf,.txt"><p class="text-center my-2 text-gray-400">Or paste manually</p><textarea id="jdText" rows="6" class="form-textarea" placeholder="Paste job description here..."></textarea></div>
+                <div id="errorMessage" class="hidden"></div>
+                <div id="loading" class="hidden text-center"><div class="spinner"></div><p class="text-amber-500 font-semibold">Contacting Gemini AI...</p></div>
+                <div id="upload-buttons" class="flex justify-between items-center"><button id="backBtn1" class="btn-secondary">← Back</button><button id="generateQuestionsBtn" class="btn-primary">Generate Questions 📝</button></div>
+            </div>
+        </section>
+
+        <section id="step3" class="ai-card hidden">
+            <div class="step-indicator"><div class="step-number">3</div><h2 class="text-2xl font-semibold text-white">Voice Interview</h2></div>
+            <div class="space-y-6">
+                <h3 class="text-lg font-medium">Question <span id="currentQuestionNum">1</span> of <span id="totalQuestions">3</span></h3>
+                <div class="w-full bg-gray-700 rounded-full h-2.5"><div id="progressBar" class="bg-amber-500 h-2.5 rounded-full"></div></div>
+                <p id="questionText" class="text-xl text-gray-100 p-6 bg-gray-900 rounded-lg min-h-[100px]"></p>
+                <div class="flex justify-center items-center gap-8">
+                    <button id="speakQuestionBtn" class="bg-gray-700 p-4 rounded-full text-amber-500 hover:bg-gray-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.414z" clip-rule="evenodd" /></svg></button>
+                    <button id="startAnswerBtn" class="mic-button bg-cyan-500 p-6 rounded-full text-white hover:bg-cyan-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd" /></svg></button>
+                </div>
+                <div class="p-4 bg-gray-900 rounded-lg min-h-[120px]"><p class="text-sm text-gray-400 mb-2">Your Answer (Voice-to-Text):</p><p id="answerText" class="text-gray-200"></p></div>
+                <div id="interview-loading" class="hidden text-center"><div class="spinner"></div><p class="text-amber-500 font-semibold">Gemini AI is analyzing...</p></div>
+                <div id="interview-buttons" class="flex justify-end"><button id="nextQuestionBtn" class="btn-primary">Next Question →</button></div>
+            </div>
+        </section>
+        
+        <section id="step4" class="ai-card hidden">
+            <div class="step-indicator"><div class="step-number">4</div><h2 class="text-2xl font-semibold text-white">Interview Feedback</h2></div>
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Overall Score</p><p id="overallScore" class="text-4xl font-bold text-amber-400">0%</p></div>
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Technical Skills</p><p id="technicalScore" class="text-4xl font-bold text-white">0%</p></div>
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Communication</p><p id="communicationScore" class="text-4xl font-bold text-white">0%</p></div>
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Problem Solving</p><p id="problemSolvingScore" class="text-4xl font-bold text-white">0%</p></div>
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Cultural Fit</p><p id="culturalFitScore" class="text-4xl font-bold text-white">0%</p></div>
+                    <div class="p-4 bg-gray-700 rounded-lg"><p class="text-sm text-gray-400">Experience Relevance</p><p id="experienceRelevanceScore" class="text-4xl font-bold text-white">0%</p></div>
+                </div>
+                <div class="p-6 bg-gray-900 rounded-lg"><h3 class="text-xl font-semibold mb-3 text-white">Detailed Feedback</h3><div id="detailedFeedback" class="prose prose-invert text-gray-300"></div></div>
+                <div class="text-center"><button id="startNewInterviewBtn" class="btn-primary">Start New Interview 🚀</button></div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const state = { currentStep: 1, candidateInfo: {}, resumeText: '', jobDescriptionText: '', questions: [], answers: [], currentQuestionIndex: 0, results: {} };
+            const steps = { 1: document.getElementById('step1'), 2: document.getElementById('step2'), 3: document.getElementById('step3'), 4: document.getElementById('step4') };
+            const inputs = { candidateName: document.getElementById('candidateName'), jobTitle: document.getElementById('jobTitle'), experienceLevel: document.getElementById('experienceLevel'), resumeFile: document.getElementById('resumeFile'), jdFile: document.getElementById('jdFile'), jdText: document.getElementById('jdText') };
+            const ui = { loading: document.getElementById('loading'), uploadButtons: document.getElementById('upload-buttons'), interviewLoading: document.getElementById('interview-loading'), interviewButtons: document.getElementById('interview-buttons'), questionText: document.getElementById('questionText'), currentQuestionNum: document.getElementById('currentQuestionNum'), totalQuestions: document.getElementById('totalQuestions'), progressBar: document.getElementById('progressBar'), answerText: document.getElementById('answerText'), startAnswerBtn: document.getElementById('startAnswerBtn'), resumeUploadArea: document.getElementById('resumeUpload'), resumeUploadText: document.getElementById('resumeUploadText'), jdUploadArea: document.getElementById('jdUpload'), jdUploadText: document.getElementById('jdUploadText'), errorMessage: document.getElementById('errorMessage'), generateQuestionsBtn: document.getElementById('generateQuestionsBtn') };
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition;
+            if(SpeechRecognition) { recognition = new SpeechRecognition(); recognition.continuous = true; recognition.interimResults = true; recognition.lang = 'en-US'; } else { console.error("Speech Recognition not supported."); ui.startAnswerBtn.disabled = true; ui.startAnswerBtn.innerHTML = "Mic Not Supported"; }
+            const synth = window.speechSynthesis;
+            function showStep(stepNumber) { Object.values(steps).forEach(el => el.classList.add('hidden')); if (steps[stepNumber]) steps[stepNumber].classList.remove('hidden'); }
+            function displayError(message) { ui.errorMessage.textContent = message; ui.errorMessage.classList.remove('hidden'); }
+            function clearError() { ui.errorMessage.classList.add('hidden'); }
+            document.getElementById('continueBtn').addEventListener('click', () => { state.candidateInfo = { name: inputs.candidateName.value, title: inputs.jobTitle.value, experience: inputs.experienceLevel.value }; showStep(2); });
+            document.getElementById('backBtn1').addEventListener('click', () => showStep(1));
+            ui.generateQuestionsBtn.addEventListener('click', handleGenerateQuestions);
+            document.getElementById('speakQuestionBtn').addEventListener('click', speakCurrentQuestion);
+            if (recognition) { ui.startAnswerBtn.addEventListener('click', toggleSpeechRecognition); recognition.onresult = handleRecognitionResult; recognition.onend = () => { if (ui.startAnswerBtn.classList.contains('recording')) { toggleSpeechRecognition(); } }; }
+            document.getElementById('nextQuestionBtn').addEventListener('click', handleNextQuestion);
+            document.getElementById('startNewInterviewBtn').addEventListener('click', resetApp);
+            ui.resumeUploadArea.addEventListener('click', () => inputs.resumeFile.click());
+            inputs.resumeFile.addEventListener('change', (e) => handleFileSelect(e, 'resume'));
+            ui.jdUploadArea.addEventListener('click', () => inputs.jdFile.click());
+            inputs.jdFile.addEventListener('change', (e) => handleFileSelect(e, 'jd'));
+            function handleFileSelect(event, type) { const file = event.target.files[0]; if (!file) return; const uploadTextElement = type === 'resume' ? ui.resumeUploadText : ui.jdUploadText; uploadTextElement.textContent = `Processing: ${file.name}...`; if (file.type === "application/pdf") { const reader = new FileReader(); reader.onload = function(e) { const typedarray = new Uint8Array(e.target.result); pdfjsLib.getDocument(typedarray).promise.then(pdf => Promise.all(Array.from({ length: pdf.numPages }, (_, i) => pdf.getPage(i + 1).then(page => page.getTextContent())))).then(pageContents => { const text = pageContents.map(content => content.items.map(item => item.str).join(' ')).join('\n\n'); if (type === 'resume') state.resumeText = text; else state.jobDescriptionText = text; uploadTextElement.innerHTML = `✅ <span class="text-green-400">${file.name}</span>`; }).catch(err => { console.error("PDF Error:", err); uploadTextElement.innerHTML = `❌ <span class="text-red-400">Error reading ${file.name}</span>`; }); }; reader.readAsArrayBuffer(file); } else { const reader = new FileReader(); reader.onload = (e) => { if (type === 'resume') state.resumeText = e.target.result; else state.jobDescriptionText = e.target.result; uploadTextElement.innerHTML = `✅ <span class="text-green-400">${file.name}</span>`; }; reader.readAsText(file); } }
+            async function handleGenerateQuestions() { clearError(); if (!state.resumeText) { displayError("Please upload a resume."); return; } if (!state.jobDescriptionText && !inputs.jdText.value) { displayError("Please upload or paste a job description."); return; } state.jobDescriptionText = state.jobDescriptionText || inputs.jdText.value; ui.loading.classList.remove('hidden'); ui.uploadButtons.classList.add('hidden'); ui.generateQuestionsBtn.disabled = true; try { const generatedQuestions = await callApiForQuestions(); state.questions = generatedQuestions; state.answers = new Array(state.questions.length).fill(''); showStep(3); renderCurrentQuestion(); } catch (error) { console.error("Error generating questions:", error); displayError(`Failed to generate questions. ${error.message}.`); } finally { ui.loading.classList.add('hidden'); ui.uploadButtons.classList.remove('hidden'); ui.generateQuestionsBtn.disabled = false; } }
+            function speakCurrentQuestion() { if (synth.speaking) synth.cancel(); const question = state.questions[state.currentQuestionIndex]; if (question) { const utterance = new SpeechSynthesisUtterance(question); synth.speak(utterance); } }
+            function toggleSpeechRecognition() { const isRecording = ui.startAnswerBtn.classList.toggle('recording'); if (isRecording) { ui.answerText.textContent = ''; recognition.start(); ui.startAnswerBtn.classList.remove('bg-cyan-500', 'hover:bg-cyan-600'); ui.startAnswerBtn.classList.add('bg-red-500', 'hover:bg-red-600'); } else { recognition.stop(); ui.startAnswerBtn.classList.add('bg-cyan-500', 'hover:bg-cyan-600'); ui.startAnswerBtn.classList.remove('bg-red-500', 'hover:bg-red-600'); state.answers[state.currentQuestionIndex] = ui.answerText.textContent; } }
+            function handleRecognitionResult(event) { let finalTranscript = ''; for (let i = event.resultIndex; i < event.results.length; ++i) { if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript; else ui.answerText.textContent = finalTranscript + event.results[i][0].transcript; } ui.answerText.textContent = finalTranscript; state.answers[state.currentQuestionIndex] = finalTranscript; }
+            async function handleNextQuestion() { if (ui.startAnswerBtn.classList.contains('recording')) toggleSpeechRecognition(); if (state.currentQuestionIndex < state.questions.length - 1) { state.currentQuestionIndex++; renderCurrentQuestion(); } else { await evaluateInterview(); } }
+            async function evaluateInterview() { ui.interviewLoading.classList.remove('hidden'); ui.interviewButtons.classList.add('hidden'); try { const results = await callApiForEvaluation(); state.results = results; renderResults(); showStep(4); } catch (error) { console.error("Error evaluating interview:", error); alert(`Failed to evaluate: ${error.message}.`); showStep(3); } finally { ui.interviewLoading.classList.add('hidden'); ui.interviewButtons.classList.remove('hidden'); } }
+            
+            function renderCurrentQuestion() {
+                const question = state.questions[state.currentQuestionIndex];
+                ui.questionText.textContent = question;
+                ui.currentQuestionNum.textContent = state.currentQuestionIndex + 1;
+                ui.totalQuestions.textContent = state.questions.length;
+                ui.progressBar.style.width = `${((state.currentQuestionIndex + 1) / state.questions.length) * 100}%`;
+                ui.answerText.textContent = '';
+                document.getElementById('nextQuestionBtn').textContent = (state.currentQuestionIndex === state.questions.length - 1) ? 'Finish & Get Feedback →' : 'Next Question →';
+            }
+
+            function renderResults() {
+                const { results } = state;
+                document.getElementById('overallScore').textContent = `${results.overallScore ?? 0}%`;
+                document.getElementById('technicalScore').textContent = `${results.technicalScore ?? 0}%`;
+                document.getElementById('communicationScore').textContent = `${results.communicationScore ?? 0}%`;
+                document.getElementById('problemSolvingScore').textContent = `${results.problemSolvingScore ?? 0}%`;
+                document.getElementById('culturalFitScore').textContent = `${results.culturalFitScore ?? 0}%`;
+                document.getElementById('experienceRelevanceScore').textContent = `${results.experienceRelevanceScore ?? 0}%`;
+                const feedback = results.detailedFeedback || results;
+                const feedbackHtml = `
+                    <p class="mb-4">${feedback.summary || 'No summary was provided.'}</p>
+                    <h4 class="font-semibold text-green-400">Strengths:</h4>
+                    <p class="mb-4">${feedback.strengths || 'No strengths were identified.'}</p>
+                    <h4 class="font-semibold text-yellow-400">Areas for Improvement:</h4>
+                    <p>${feedback.areasForImprovement || 'No areas for improvement were identified.'}</p>
+                `;
+                document.getElementById('detailedFeedback').innerHTML = feedbackHtml;
+            }
+
+            function resetApp() { Object.assign(state, { currentStep: 1, candidateInfo: {}, resumeText: '', jobDescriptionText: '', questions: [], answers: [], currentQuestionIndex: 0, results: {} }); Object.values(inputs).forEach(input => { if (input.type === 'file') input.value = ''; else if (input.tagName.toLowerCase() !== 'select') input.value = ''; }); inputs.experienceLevel.selectedIndex = 1; ui.resumeUploadText.innerHTML = 'Click to upload (PDF, TXT)'; ui.jdUploadText.innerHTML = 'Click to upload (PDF, TXT)'; clearError(); showStep(1); }
+
+            async function callApiForQuestions() {
+                const systemPrompt = "You are an expert technical recruiter... Your response MUST be a valid JSON object with a single 'questions' key (an array of exactly three strings).";
+                const userPrompt = `Generate interview questions based on this resume and job description.\n\n**Resume:**\n${state.resumeText}\n\n**Job Description:**\n${state.jobDescriptionText}`;
+                const payload = { "systemInstruction": { "parts": [{ "text": systemPrompt }] }, "contents": [{ "parts": [{ "text": userPrompt }] }], "generationConfig": { "responseMimeType": "application/json" } };
+                const response = await fetch("http://localhost:3000/api/generate", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) { const errorBody = await response.json(); throw new Error(errorBody.error); }
+                const result = await response.json();
+                return result.questions;
+            }
+
+            // --- THIS FUNCTION IS NOW UPDATED TO INCLUDE FULL CONTEXT ---
+            async function callApiForEvaluation() {
+                const systemPrompt = `You are a fair and experienced interview evaluator. Your task is to analyze a candidate's resume, a job description, and a list of interview questions and answers. Provide a comprehensive evaluation with scores from 0 to 100 and detailed written feedback. Your response MUST be a single, valid JSON object following this exact structure: {"overallScore": number, "technicalScore": number, "communicationScore": number, "problemSolvingScore": number, "culturalFitScore": number, "experienceRelevanceScore": number, "detailedFeedback": {"summary": "string", "strengths": "string", "areasForImprovement": "string"}}.`;
+                
+                let userPrompt = `Please evaluate the following interview session based on the provided resume and job description.\n\n`;
+                userPrompt += `--- CANDIDATE RESUME ---\n${state.resumeText}\n\n`;
+                userPrompt += `--- JOB DESCRIPTION ---\n${state.jobDescriptionText}\n\n`;
+                userPrompt += `--- INTERVIEW QUESTIONS & ANSWERS ---\n`;
+                
+                state.questions.forEach((q, i) => {
+                    userPrompt += `**Question ${i+1}:** ${q}\n**Answer ${i+1}:** ${state.answers[i] || "(No answer provided)"}\n\n`;
+                });
+
+                const payload = { 
+                    "systemInstruction": { "parts": [{ "text": systemPrompt }] }, 
+                    "contents": [{ "parts": [{ "text": userPrompt }] }], 
+                    "generationConfig": { "responseMimeType": "application/json" } 
+                };
+                const response = await fetch("http://localhost:3000/api/evaluate", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) { const errorBody = await response.json(); throw new Error(errorBody.error); }
+                return await response.json();
+            }
+
+            showStep(1);
+        });
+    </script>
+</body>
+</html>
